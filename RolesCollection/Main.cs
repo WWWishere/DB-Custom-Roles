@@ -6,7 +6,7 @@ using MelonLoader;
 using UnityEngine;
 
 
-[assembly: MelonInfo(typeof(RolesCollection.Main), "Role Ideas Collection", "1.0", "SS122")]
+[assembly: MelonInfo(typeof(RolesCollection.Main), "Role Ideas Collection", "1.1", "SS122")]
 [assembly: MelonGame("UmiArt", "Demon Bluff")]
 namespace RolesCollection;
 
@@ -14,7 +14,7 @@ public class Main : MelonMod
 {
     public override void OnInitializeMelon()
     {
-        ClassInjector.RegisterTypeInIl2Cpp<Lookout>();
+        ClassInjector.RegisterTypeInIl2Cpp<Lookout2>();
     }
     public override void OnLateInitializeMelon()
     {
@@ -106,7 +106,7 @@ public static class Stats
     public static Dictionary<string, CharacterData> roles = new Dictionary<string, CharacterData>();
     public static CharacterData[] allDatas = Array.Empty<CharacterData>();
     public static ECharacterStatus phantom = (ECharacterStatus)151;
-    public static Lookout lookout = new Lookout();
+    public static Lookout2 lookout = new Lookout2();
     public static CharacterData? StatsGetData(string name)
     {
         if (Stats.roles.ContainsKey(name))
@@ -133,7 +133,7 @@ public static class Stats
     {
         return ilList[UnityEngine.Random.RandomRangeInt(0, ilList.Count)];
     }
-    public static Lookout GetLookout()
+    public static Lookout2 GetLookout()
     {
         return lookout;
     }
