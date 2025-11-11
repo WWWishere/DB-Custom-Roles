@@ -321,6 +321,10 @@ public static class ResetAffected
 {
     public static bool Prefix(Characters __instance, ref Il2CppSystem.Collections.Generic.List<CharacterData> charactersList)
     {
+        Rook rook = Stats.GetRook();
+        rook.ResetAllLists();
+        SoulCollector soulCollector = Stats.GetSoulCollector();
+        soulCollector.StopCountdown();
         Lookout2 lookout = Stats.GetLookout();
         lookout.InitAffected(charactersList.Count);
         return true;
@@ -333,7 +337,7 @@ public static class SwapIndex
     public static void Postfix(Character __instance, ref CharacterData character)
     {
         Lookout2 lookout = Stats.GetLookout();
-        if (lookout.checking && character == Stats.StatsGetData("Counsellor"))
+        if (lookout.checking && character == Stats.StatsGetData("Chancellor"))
         {
             lookout.baronSwap = __instance.id;
         }

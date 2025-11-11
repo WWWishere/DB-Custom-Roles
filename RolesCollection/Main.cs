@@ -2,11 +2,14 @@
 using Il2Cpp;
 using Il2CppInterop.Runtime;
 using Il2CppInterop.Runtime.Injection;
+using Il2CppTMPro;
 using MelonLoader;
 using UnityEngine;
+using UnityEngine.Events;
+using UnityEngine.EventSystems;
 
 
-[assembly: MelonInfo(typeof(RolesCollection.Main), "Role Ideas Collection", "1.1", "SS122")]
+[assembly: MelonInfo(typeof(RolesCollection.Main), "Role Ideas Collection", "1.3", "SS122")]
 [assembly: MelonGame("UmiArt", "Demon Bluff")]
 namespace RolesCollection;
 
@@ -15,22 +18,81 @@ public class Main : MelonMod
     public override void OnInitializeMelon()
     {
         ClassInjector.RegisterTypeInIl2Cpp<Lookout2>();
+        ClassInjector.RegisterTypeInIl2Cpp<SoulCollector>();
+        ClassInjector.RegisterTypeInIl2Cpp<Rook>();
+        ClassInjector.RegisterTypeInIl2Cpp<Sheep>();
+        ClassInjector.RegisterTypeInIl2Cpp<OutcastShepherd>();
+        ClassInjector.RegisterTypeInIl2Cpp<CountdownTimer>();
     }
     public override void OnLateInitializeMelon()
     {
         Application.runInBackground = true;
+        var loadedFonts = Resources.FindObjectsOfTypeAll(Il2CppSystem.Type.GetTypeFromHandle(RuntimeReflectionHelper.GetRuntimeTypeHandle<TMP_FontAsset>()));
+        Stats.fonts = new TMP_FontAsset[loadedFonts.Length];
+        for (int i = 0; i < loadedFonts.Length; i++)
+        {
+            TMP_FontAsset asset = loadedFonts[i]!.Cast<TMP_FontAsset>();
+            // MelonLogger.Msg("Font asset: " + asset.name);
+            Stats.fonts[i] = asset;
+        }
         Stats.GetStartingRoles();
+        Stats.CreateApocalypseTag();
+        Stats.CreateDeathTimer(Stats.dethTimer);
         CharacterData lookout = Stats.createCharData("Lookout", "Witness", ECharacterType.Villager,
         EAlignment.Good, Stats.lookout, true, EAbilityUsage.ResetAfterNight);
         lookout.bluffable = true;
         lookout.description = "Pick a Character. Learn who they affected.";
         lookout.flavorText = "\"Could've been a sniper. She was too busy watching the Puppeteer.\"";
         lookout.characterId = "Lookout_RCol";
+        CharacterData soulCollector = Stats.createCharData("Soul Collector", "Baa", ECharacterType.Demon,
+        EAlignment.Evil, Stats.soulCollector);
+        soulCollector.bluffable = false;
+        soulCollector.description = "<b>Game Start:</b>\nReap 2 characters.\nReaped characters Register as a Soul Collector.\n\nWhen you execute a good character, I become <b>Death.</b>";
+        soulCollector.flavorText = "\"Is afraid of the dark so they carry a lantern with them\"";
+        soulCollector.characterId = "SoulCollector_RCol";
+        CharacterData death = Stats.createCharData("Death", "Baa", ECharacterType.Demon,
+        EAlignment.Evil, Stats.soulCollector);
+        death.bluffable = false;
+        death.description = "A 20-second timer starts.\nIf time run outs, I will kill all other characters, dealing 5 damage to you for each character.";
+        death.flavorText = "\"Your time is almost up\"";
+        death.characterId = "Death_RCol";
+        soulCollector.type = Stats.apocalypse;
+        death.type = Stats.apocalypse;
+        CharacterData rook = Stats.createCharData("Rook", "Bombardier", ECharacterType.Outcast,
+        EAlignment.Good, Stats.rook);
+        rook.bluffable = true;
+        rook.description = "Swaps around two random disguised characters, making any information mentioning their number and position obsolete.";
+        rook.flavorText = "\"And he sacrifices..... THE ROOK!\"";
+        rook.characterId = "Rook_RCol";
+        // Funny shepherd role
+        /*
+        CharacterData sheep = Stats.createCharData("Sheep", "Bombardier", ECharacterType.Villager,
+        EAlignment.Good, new Sheep());
+        sheep.bluffable = false;
+        sheep.description = "A sheep.";
+        sheep.flavorText = "\"Baaaaaaa...\"";
+        sheep.characterId = "Sheep_RCol";
+        CharacterData shepherd = Stats.createCharData("Shepherd", "Bombardier", ECharacterType.Outcast,
+        EAlignment.Good, new OutcastShepherd(sheep));
+        shepherd.bluffable = true;
+        shepherd.description = "Adjacent Good Villagers become Sheep.";
+        shepherd.hints = "If I am Executed while Good:\nI will take away 4 additional health from you.";
+        shepherd.flavorText = "\"Baa?\"";
+        shepherd.characterId = "Shepherd_RCol";
+        Characters.Instance.startGameActOrder = insertAfterAct("Shaman", shepherd);
+        */
+        Characters.Instance.startGameActOrder = insertAfterAct("Chancellor", rook);
+        Characters.Instance.startGameActOrder = insertAfterAct("Lilis", soulCollector);
+
         foreach (CustomScriptData scriptData in ProjectContext.Instance.gameData.advancedAscension.possibleScriptsData)
         {
             ScriptInfo script = scriptData.scriptInfo;
             addRole(script.startingTownsfolks, lookout);
+            addRole(script.startingOutsiders, rook);
         }
+        CharactersCount sc10 = new CharactersCount(10, 7, 1, 2, 0);
+        CharactersCount sc9 = new CharactersCount(9, 6, 1, 2, 0);
+        addDemonRole(ProjectContext.Instance.gameData.advancedAscension, soulCollector, new List<CharactersCount>() { sc9, sc10, sc10 }, "SC_Test", 2);
     }
     public override void OnUpdate()
     {
@@ -43,6 +105,11 @@ public class Main : MelonMod
                 for (int i = 0; i < loadedCharList.Length; i++)
                 {
                     CharacterData data = loadedCharList[i]!.Cast<CharacterData>();
+                    if (data.name == "Pestilence")
+                    {
+                        // MelonLogger.Msg("Found Pestilence! in " + data.characterId);
+                        data.type = Stats.apocalypse;
+                    }
                     Stats.CheckAddRole(data);
                     Stats.allDatas[i] = data;
                 }
@@ -51,6 +118,18 @@ public class Main : MelonMod
             {
                 Stats.OnFirstUpdate();
             }
+        }
+        SoulCollector sc = Stats.soulCollector;
+        if (sc.runCountDown)
+        {
+            if (sc.countdown % 60 == 0)
+            {
+                int seconds = sc.countdown / 60;
+                MelonLogger.Msg("Time left: " + seconds + " seconds");
+                CountdownTimer timer = Stats.dethTimer.GetComponent<CountdownTimer>();
+                timer.UpdateCountdown(seconds);
+            }
+            sc.ReduceCountdown();
         }
     }
     public void addDemonRole(AscensionsData advancedAscension, CharacterData? data, string oldScriptName, string newScriptName, int weight = 1)
@@ -84,6 +163,34 @@ public class Main : MelonMod
             }
         }
     }
+
+    public void addDemonRole(AscensionsData advancedAscension, CharacterData? data, List<CharactersCount> counts, string newScriptName, int weight = 1)
+    {
+        if (data == null)
+        {
+            return;
+        }
+        CustomScriptData newScriptData = new CustomScriptData();
+        newScriptData.name = newScriptName;
+        ScriptInfo newScript = new ScriptInfo();
+        ScriptInfo script = ProjectContext.Instance.gameData.advancedAscension.possibleScriptsData[0].scriptInfo;
+        newScriptData.scriptInfo = newScript;
+        newScript.startingTownsfolks = script.startingTownsfolks;
+        newScript.startingOutsiders = script.startingOutsiders;
+        newScript.startingMinions = script.startingMinions;
+        foreach (CharactersCount count in counts)
+        {
+            newScript.characterCounts.Add(count);
+        }
+        newScript.startingDemons = new Il2CppSystem.Collections.Generic.List<CharacterData>();
+        newScript.startingDemons.Add(data);
+        var newPSD = advancedAscension.possibleScriptsData.Append(newScriptData);
+        for (int i = 0; i < weight - 1; i++)
+        {
+            newPSD = newPSD.Append(newScriptData);
+        }
+        advancedAscension.possibleScriptsData = newPSD.ToArray();
+    }
     public void addRole(Il2CppSystem.Collections.Generic.List<CharacterData> list, CharacterData? data)
     {
         if (data == null)
@@ -100,13 +207,47 @@ public class Main : MelonMod
     {
         return Stats.StatsGetData(name);
     }
+    public CharacterData[] insertAfterAct(string previous, CharacterData data)
+    {
+        CharacterData[] actList = Characters.Instance.startGameActOrder;
+        int actSize = actList.Length;
+        CharacterData[] newActList = new CharacterData[actSize + 1];
+        bool inserted = false;
+        for (int i = 0; i < actSize; i++)
+        {
+            if (inserted)
+            {
+                newActList[i + 1] = actList[i];
+            }
+            else
+            {
+                newActList[i] = actList[i];
+                if (actList[i].name == previous)
+                {
+                    newActList[i + 1] = data;
+                    inserted = true;
+                }
+            }
+        }
+        if (!inserted)
+        {
+            LoggerInstance.Msg("");
+        }
+        return newActList;
+    }
 }
 public static class Stats
 {
     public static Dictionary<string, CharacterData> roles = new Dictionary<string, CharacterData>();
     public static CharacterData[] allDatas = Array.Empty<CharacterData>();
-    public static ECharacterStatus phantom = (ECharacterStatus)151;
+    public static ECharacterStatus reaped = (ECharacterStatus)205;
     public static Lookout2 lookout = new Lookout2();
+    public static Rook rook = new Rook();
+    public static SoulCollector soulCollector = new SoulCollector();
+    public static ECharacterType apocalypse = (ECharacterType)101;
+    public static GenericHint hint = FindGeneralHint();
+    public static GameObject dethTimer = new GameObject();
+    public static TMP_FontAsset[] fonts = Array.Empty<TMP_FontAsset>();
     public static CharacterData? StatsGetData(string name)
     {
         if (Stats.roles.ContainsKey(name))
@@ -129,13 +270,21 @@ public static class Stats
     {
         return ilList[UnityEngine.Random.RandomRangeInt(0, ilList.Count)];
     }
-    public static T RandomItem<T>(List<T> ilList)
+    public static T RandomItem<T>(List<T> list)
     {
-        return ilList[UnityEngine.Random.RandomRangeInt(0, ilList.Count)];
+        return list[UnityEngine.Random.RandomRangeInt(0, list.Count)];
     }
     public static Lookout2 GetLookout()
     {
         return lookout;
+    }
+    public static Rook GetRook()
+    {
+        return rook;
+    }
+    public static SoulCollector GetSoulCollector()
+    {
+        return soulCollector;
     }
     public static void OnFirstUpdate()
     {
@@ -226,5 +375,116 @@ public static class Stats
         newData.startingAlignment = alignment;
         newData.type = type;
         return newData;
+    }
+
+    public static void CreateApocalypseTag()
+    {
+        GameObject info = GameObject.Find("Game/MoreInfo");
+        GameObject ruleBook = GameObject.Find("Game/Gameplay/Content/RuleBook/Panel");
+        // Path 1: Game/MoreInfo/Skins_Change/Panel/CharacterHint (1)/Tags/Layout/
+        // Path 2: Game/MoreInfo/CardExplanationUI/Panel/Tags/Tags/Layout/View (4)/
+        // Path 3: Game/MoreInfo/SkinUnlocked_Details/Panel/CharacterHint (1)/Tags/Layout/
+        // Path 4: Game/Gameplay/Content/RuleBook/Panel/CharacterHint (1)/Tags/Layout/
+        // Path 5: Game/Gameplay/Content/RuleBook/Panel/CharacterHint (2)/Tags/Layout/
+        // Path 6: Game/MoreInfo/CardExplanationUI/Panel/CharacterHint (1)/Tags/Layout/
+        // Path 7: Game/MoreInfo/CharacterHint/Tags/Layout/
+        // Path 8: Game/MoreInfo/AchievementDetails/Panel/CharacterHint (1)/Tags/Layout/
+        // Path 9: Game/MoreInfo/CardExplanationUI/Panel/Tags/Tags/Layout/
+        GameObject ch1 = info.transform.Find("Skins_Change/Panel/CharacterHint (1)").gameObject;
+        GameObject ch2 = info.transform.Find("CardExplanationUI/Panel/Tags").gameObject;
+        GameObject ch3 = info.transform.Find("SkinUnlocked_Details/Panel/CharacterHint (1)").gameObject;
+        GameObject ch4 = ruleBook.transform.Find("CharacterHint (1)").gameObject;
+        GameObject ch5 = ruleBook.transform.Find("CharacterHint (2)").gameObject;
+        GameObject ch6 = info.transform.Find("CardExplanationUI/Panel/CharacterHint (1)").gameObject;
+        GameObject ch7 = info.transform.Find("CharacterHint").gameObject;
+        GameObject ch8 = info.transform.Find("AchievementDetails/Panel/CharacterHint (1)").gameObject;
+        AddApocalypseTag(ch1);
+        AddApocalypseTag(ch3);
+        AddApocalypseTag(ch4);
+        AddApocalypseTag(ch5);
+        AddApocalypseTag(ch6);
+        AddApocalypseTag(ch7);
+        AddApocalypseTag(ch8);
+        CharacterHint ch2Hint = ch2.GetComponent<CharacterHint>();
+        GameObject ch2View1 = ch2.transform.Find("Tags/Layout/View (4)").gameObject;
+        Transform parent = ch2View1.transform.GetParent();
+        GameObject apocHint = GameObject.Instantiate(ch2View1, parent);
+        apocHint.transform.SetSiblingIndex(4);
+        apocHint.name = "View (Apoc Tag)";
+        CharacterTag apocHintTag = apocHint.GetComponent<CharacterTag>();
+        apocHintTag.alignment = EAlignment.None;
+        apocHintTag.type = apocalypse;
+        GameObject apoc = apocHint.transform.GetChild(0).gameObject;
+        apoc.name = "View (Apoc Tag)";
+        CharacterTag apocTag = apoc.GetComponent<CharacterTag>();
+        apocTag.alignment = EAlignment.None;
+        apocTag.type = apocalypse;
+        GameObject text = apoc.transform.GetChild(3).gameObject;
+        TextMeshProUGUI apocText = text.GetComponent<TextMeshProUGUI>();
+        apocText.text = "Apocalypse";
+        var postAppend = ch2Hint.tags.Append(apocHintTag);
+        ch2Hint.tags = postAppend.ToArray();
+        EventTrigger eventTrigger = apocHint.GetComponent<EventTrigger>();
+        UnityEngine.Object.Destroy(eventTrigger);
+        ApocHint newTrigger = apocHint.AddComponent<ApocHint>();
+        SimpleUIInfo uiInfo = GameObject.FindObjectOfType<SimpleUIInfo>();
+        Transform apocHintPivot = apocHint.transform.GetChild(1);
+        newTrigger.SetGeneralHint(hint.gameObject, uiInfo, apocHintPivot);
+    }
+    public static void AddApocalypseTag(GameObject tag)
+    {
+        GameObject view = tag.transform.Find("Tags/Layout/View (4)").gameObject;
+        CharacterHint characterHint = tag.GetComponent<CharacterHint>();
+        Transform parent = view.transform.GetParent();
+        GameObject apoc = GameObject.Instantiate(view, parent);
+        apoc.transform.SetSiblingIndex(4);
+        apoc.name = "View (Apoc Tag)";
+        CharacterTag apocTag = apoc.GetComponent<CharacterTag>();
+        apocTag.alignment = EAlignment.None;
+        apocTag.type = apocalypse;
+        GameObject text = apoc.transform.GetChild(3).gameObject;
+        TextMeshProUGUI apocText = text.GetComponent<TextMeshProUGUI>();
+        apocText.text = "Apocalypse";
+        var postAppend = characterHint.tags.Append(apocTag);
+        characterHint.tags = postAppend.ToArray();
+    }
+    public static GenericHint FindGeneralHint()
+    {
+        SimpleUIInfo allHints = GameObject.FindObjectOfType<SimpleUIInfo>();
+        GenericHint genericHint = allHints.genericHint;
+        return genericHint;
+    }
+    public static void SetFont(TextMeshProUGUI textItem, string name)
+    {
+        foreach (TMP_FontAsset font in fonts)
+        {
+            if (font != null)
+            {
+                if (font.name == name)
+                {
+                    textItem.font = font;
+                }
+            }
+        }
+    }
+    public static void CreateDeathTimer(GameObject timer)
+    {
+        // Missing parts: set the parent object of timer, set the local pos of timer
+        timer.name = "Countdown";
+        GameObject gameplay = GameObject.Find("Game/Gameplay/Content/Canvas/Characters");
+        if (gameplay != null)
+        {
+            timer.transform.SetParent(gameplay.transform);
+        }
+        CountdownTimer cd = timer.AddComponent<CountdownTimer>();
+        GameObject timerTM = new GameObject("Text (TMP)");
+        timerTM.transform.SetParent(timer.transform);
+        TextMeshProUGUI timerText = timerTM.AddComponent<TextMeshProUGUI>();
+        cd.SetTextItem(timerText);
+        timer.SetActive(false);
+        timer.transform.localScale = new Vector3(1f, 1f, 1f);
+        timerTM.transform.localScale = new Vector3(1f, 1f, 1f);
+        timer.transform.localPosition = new Vector3(0f, 400f, 0f);
+        SetFont(timerText, "Alata-Regular SDF");
     }
 }
