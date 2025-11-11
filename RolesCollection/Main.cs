@@ -15,6 +15,7 @@ namespace RolesCollection;
 
 public class Main : MelonMod
 {
+    bool disableRook = false;
     public override void OnInitializeMelon()
     {
         ClassInjector.RegisterTypeInIl2Cpp<Lookout2>();
@@ -88,7 +89,10 @@ public class Main : MelonMod
         {
             ScriptInfo script = scriptData.scriptInfo;
             addRole(script.startingTownsfolks, lookout);
-            addRole(script.startingOutsiders, rook);
+            if (!disableRook)
+            {
+                addRole(script.startingOutsiders, rook);
+            }
         }
         CharactersCount sc10 = new CharactersCount(10, 7, 1, 2, 0);
         CharactersCount sc9 = new CharactersCount(9, 6, 1, 2, 0);
@@ -109,6 +113,10 @@ public class Main : MelonMod
                     {
                         // MelonLogger.Msg("Found Pestilence! in " + data.characterId);
                         data.type = Stats.apocalypse;
+                    }
+                    if (data.name == "Rook" && data.characterId != "Rook_RCol")
+                    {
+                        disableRook = true;
                     }
                     Stats.CheckAddRole(data);
                     Stats.allDatas[i] = data;

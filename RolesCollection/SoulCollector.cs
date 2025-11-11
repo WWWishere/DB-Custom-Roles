@@ -195,3 +195,22 @@ public static class StopOnGameEnd
         soulCollector.StopCountdown();
     }
 }
+
+[HarmonyPatch(typeof(Character), nameof(Character.Act))]
+public static class PestDamage
+{
+    public static bool Prefix(Character __instance, ref ETriggerPhase trigger)
+    {
+        if (trigger != ETriggerPhase.OnExecuted)
+        {
+            return true;
+        }
+        CharacterData data = __instance.dataRef;
+        if (data.name == "Pestilence" && data.type == Stats.apocalypse)
+        {
+            Health health = PlayerController.PlayerInfo.health;
+            health.Damage(-5);
+        }
+        return true;
+    }
+}
