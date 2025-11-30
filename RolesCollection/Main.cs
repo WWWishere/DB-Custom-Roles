@@ -54,7 +54,7 @@ public class Main : MelonMod
         CharacterData death = Stats.createCharData("Death", "Baa", ECharacterType.Demon,
         EAlignment.Evil, Stats.soulCollector);
         death.bluffable = false;
-        death.description = "A 20-second timer starts.\nIf time run outs, I will kill all other characters, dealing 5 damage to you for each character.";
+        death.description = "A 20-second timer starts.\nIf time runs out, I will kill all other characters, dealing 5 damage to you for each character.";
         death.flavorText = "\"Your time is almost up\"";
         death.characterId = "Death_RCol";
         soulCollector.type = Stats.apocalypse;
