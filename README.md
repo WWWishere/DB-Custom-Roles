@@ -5,6 +5,7 @@ Requires [MelonLoader](https://github.com/LavaGang/MelonLoader).
 
 ## Lookout (Good/Villager)
 Idea from firedragonflare.
+
 Pick a character, learn who that character has affected.
 
 ## Rook (Good/Outcast)
